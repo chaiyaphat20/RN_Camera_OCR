@@ -73,6 +73,7 @@ export default function App() {
       }
     }
   }
+  //https://ocr.space/ocrapi
   // ThaiNationalIDCardData1234567890123vauNameMr.SampleLastnameMiddleNameSatitsakul30Ia.2508DateofBirth30Mar.19651/111memJ5NI29255631s.a.255014255711:52:1429Mar.201331Dec.www.rd-comp.comDateotExpiryAThailDVt.0.0IFO. 
 
   return (
