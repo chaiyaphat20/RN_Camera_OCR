@@ -1,42 +1,66 @@
 import axios from 'axios';
 import React, { useState } from 'react'
-import { Image, Text, TouchableOpacity, View } from 'react-native'
+import { Image, Platform, Text, TouchableOpacity, View } from 'react-native'
 import { ImagePickerResponse, launchCamera } from 'react-native-image-picker'
-import TextRecognition from 'react-native-text-recognition';
+import ImageResizer from 'react-native-image-resizer';
+import RNFetchBlob from 'rn-fetch-blob';
 
 export default function App() {
   const [imageData,setImageData] = useState<ImagePickerResponse | null>(null)
 
-  const getTextFromImage = async (imageBase64:string) =>{
-    const API_KEY ="AIzaSyCuA1eYnHgYpuSl-xd6Sz_0o4MJUD1NzKE"
-    const url = `https://vision.googleapis.com/v1/images:annotate?key=${API_KEY}`
-    const data = {
-      requests:[
-        {
-          image:{
-            content:imageBase64
-          },
-          features:[
-            {
-              type:"TEXT_DETECTION",
-              maxResults:1
-            }
-          ]
-        }
-      ]
-    }
+  const imageToBase64 = async (uri:string) => {
+    // Convert image URI to base64 using rn-fetch-blob
+    const response = await RNFetchBlob.fs.readFile(uri, 'base64');
+    return `data:image/jpeg;base64,${response}`;
+  };
 
-    // const res = await axios.post(url,data)
-    const res = await fetch(url,{
-      method:"POST",
-      headers:{
-        Accept:"application/json",
-        "Content-Type":"application/json"
+  const resizeImageIfNeeded = async (base64: string) => {
+    const maxSizeInBytes = 1024 * 1024; // 1024 KB
+    const options = {
+      maxSize: 1024, // 1 MB
+      quality: 80,
+      base64: true,
+      format: 'JPEG',
+    };
+  
+    try {
+      const resizedImage = await ImageResizer.createResizedImage(base64, options.maxSize, options.maxSize, "JPEG", options.quality);
+      const resizedBase64 = await imageToBase64(resizedImage.uri);
+      return resizedBase64;
+    } catch (error) {
+      console.error('Error resizing image:', error);
+      return base64; // Return original base64 if resizing fails
+    }
+  };
+
+  const getTextFromImage = async (imageBase64:string,uri:string) =>{
+    const apiKey = '0f3cbbfe4f88957';  // Replace with your actual API key
+    const language = 'eng';
+    const isOverlayRequired = 'false';
+    const url = 'https://api.ocr.space/parse/image';
+    const resizedImage = await resizeImageIfNeeded(uri);
+    const base64Image = `data:image/jpeg;base64,${resizedImage}`;  // Replace with your base64 encoded image data
+    // Convert the base64 image string into a FormData object
+    const formData = new FormData();
+    formData.append('base64Image', resizedImage);
+    formData.append('language', language);
+    formData.append('isOverlayRequired', isOverlayRequired);
+    
+    // Make a POST request using axios
+    axios.post(url, formData, {
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'multipart/form-data',  // Set Content-Type as multipart/form-data
       },
-      body:JSON.stringify(data)
     })
-   const json = await res.json()
-   console.log(json)
+    .then(response => {
+      console.log('Response:', response.data);
+      const data =response.data.ParsedResults[0].ParsedText
+      console.log({data})
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
   }
 
   const openCamera = async()=>{
@@ -45,7 +69,7 @@ export default function App() {
       let base64 = res?.assets?.[0].base64
       if(base64){
         setImageData(res)
-        getTextFromImage(base64)
+        getTextFromImage(base64,res?.assets?.[0].uri??"")
       }
     }
   }
